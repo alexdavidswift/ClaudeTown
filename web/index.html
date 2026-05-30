@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ClaudeTown</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1 id="town-name">ClaudeTown</h1>
+    <p id="town-sub">Loading the town…</p>
+    <div id="stat-strip" class="stat-strip"></div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="map" class="active">Map</button>
+    <button data-tab="chart">Growth</button>
+    <button data-tab="people">People</button>
+    <button data-tab="history">History</button>
+  </nav>
+
+  <main>
+    <section id="tab-map" class="tab-panel active">
+      <div id="map-wrap"></div>
+      <p class="hint">Each building is placed deterministically from its founding. Hover for details.</p>
+    </section>
+
+    <section id="tab-chart" class="tab-panel">
+      <div id="charts"></div>
+    </section>
+
+    <section id="tab-people" class="tab-panel">
+      <div class="people-controls">
+        <input id="people-search" type="text" placeholder="Search by name…" />
+        <label><input type="checkbox" id="show-dead" /> include the departed</label>
+      </div>
+      <div id="people-grid"></div>
+    </section>
+
+    <section id="tab-history" class="tab-panel">
+      <div id="timeline"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="foot"></span>
+  </footer>
+
+  <script src="world.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

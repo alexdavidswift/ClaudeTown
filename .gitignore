@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Atomic-write temp files
+state/*.tmp
+
+# OS noise
+.DS_Store
