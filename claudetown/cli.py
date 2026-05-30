@@ -46,7 +46,9 @@ def cmd_tick(args):
     world = _require_world()
     months = args.months
     summary = {"births": 0, "deaths": 0, "notable": []}
-    surfaced = {"marriage", "construction", "festival", "disaster", "wonder", "death"}
+    surfaced = {"marriage", "construction", "festival", "disaster", "wonder",
+                "death", "title", "reconciliation"}
+    year_buf: dict[int, list] = {}
     for _ in range(months):
         chron = simulation.advance_month(world)
         chronicle.append_month(world, chron)
@@ -57,6 +59,13 @@ def cmd_tick(args):
             if ev["kind"] in surfaced and (ev["kind"] != "death" or
                                            _in_history(world, chron["tick"], ev["text"])):
                 summary["notable"].append(f"  [{chron['date']}] {ev['text']}")
+        # Buffer months by year; write a "year in review" when a year completes.
+        # Year Y (1-based) spans ticks (Y-1)*12 .. (Y-1)*12+11; Yuleweald, the
+        # year's end, is the month with index 11.
+        yr = chron["tick"] // 12 + 1
+        year_buf.setdefault(yr, []).append(chron)
+        if chron["tick"] % 12 == 11:  # Yuleweald: the year just ended
+            chronicle.append_year_review(world, yr, year_buf.pop(yr, []))
     worldmod.save(world)
     render.export_all(world)
 
@@ -111,16 +120,20 @@ def cmd_who(args):
     for c in matches[: args.limit]:
         status = "" if c["alive"] else " (deceased)"
         job = f", {c['job']}" if c["job"] else ""
-        print(f"  {c['id']}: {c['name']}, {_age_years(c)}{job}{status}")
+        print(f"  {c['id']}: {simulation.full_name(c)}, {_age_years(c)}{job}{status}")
 
 
 def _print_citizen(world, c):
-    print(f"=== {c['name']} (id {c['id']}) ===")
+    print(f"=== {simulation.full_name(c)} (id {c['id']}) ===")
     print(f"Age: {_age_years(c)}   {'alive' if c['alive'] else 'deceased'}")
     print(f"Traits: {', '.join(c['traits'])}")
+    if c.get("title"):
+        print(f"Known as: {simulation.full_name(c)}  (reputation {c.get('reputation', 0)})")
     if c["job"]:
-        wp = world["buildings"].get(c["workplace"], {}).get("name", "?")
-        print(f"Work: {c['job']} at {wp}")
+        wp = world["buildings"].get(c["workplace"], {})
+        wpn = wp.get("name", "?")
+        dist = wp.get("district")
+        print(f"Work: {c['job']} at {wpn}" + (f" in {dist}" if dist else ""))
     if c["partner"] and c["partner"] in world["citizens"]:
         print(f"Partner: {world['citizens'][c['partner']]['name']}")
     if c["children"]:

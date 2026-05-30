@@ -29,7 +29,7 @@ from typing import Any
 
 from . import data
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATE_PATH = os.path.join(_ROOT, "state", "world.json")
@@ -47,7 +47,40 @@ def exists() -> bool:
 
 def load() -> dict[str, Any]:
     with open(STATE_PATH, "r", encoding="utf-8") as fh:
-        return json.load(fh)
+        world = json.load(fh)
+    return migrate(world)
+
+
+def migrate(world: dict[str, Any]) -> dict[str, Any]:
+    """Upgrade an older save in place so new fields exist on every record.
+
+    Old worlds remain valid: we only *add* fields with sensible defaults and
+    backfill stable building coordinates deterministically from the seed, so a
+    town founded under schema v1 keeps unfolding without a reset.
+    """
+    ver = world.get("schema_version", 1)
+    if ver >= SCHEMA_VERSION:
+        return world
+
+    if ver < 2:
+        for c in world["citizens"].values():
+            c.setdefault("reputation", 0)
+            c.setdefault("title", None)
+            c.setdefault("deeds", [])
+        # Backfill placement for buildings that predate stored coordinates.
+        # Rebuild a temporary world view so _place_building sees a growing set.
+        mrng = random.Random(f"{world['seed']}:migrate-v2")
+        placed: dict[str, Any] = {}
+        shim = {"buildings": placed}
+        for bid, b in sorted(world["buildings"].items(),
+                             key=lambda kv: kv[1].get("founded_tick", 0)):
+            if "x" not in b or "y" not in b:
+                place = _place_building(shim, mrng, b["type"])
+                b["x"], b["y"], b["district"] = place["x"], place["y"], place["district"]
+            placed[bid] = b
+
+    world["schema_version"] = SCHEMA_VERSION
+    return world
 
 
 def save(world: dict[str, Any]) -> None:
@@ -132,9 +165,67 @@ def make_citizen(
         "died_tick": None,
         "epitaph": None,
         "milestones": [],
+        # Reputation & identity (schema v2). Reputation drifts with deeds and
+        # office; title is an earned epithet ("the Elder", "the Kind", ...).
+        "reputation": 0,
+        "title": None,
+        "deeds": [],
     }
     world["citizens"][cid] = citizen
     return citizen
+
+
+# --- Building placement ----------------------------------------------------
+
+def _place_building(world: dict[str, Any], rng: random.Random, btype: str) -> dict[str, float]:
+    """Assign stable map coordinates (and a district) at construction time.
+
+    Buildings are laid out on a golden-angle spiral around the town square so
+    the town grows organically outward and the layout never reshuffles as new
+    buildings appear -- a building keeps the same neighbors for life. Civic
+    structures cluster near the centre, homes ring them, farms sit outermost.
+    Coordinates live in an abstract 0..100 space; the viewer scales them.
+    """
+    import math
+
+    if btype == "farm":
+        category, base, step = "farm", 30.0, 4.2
+    elif btype == "house":
+        category, base, step = "house", 16.0, 3.4
+    else:
+        category, base, step = "civic", 3.0, 3.0
+
+    index = sum(1 for b in world["buildings"].values()
+                if _category(b["type"]) == category)
+    angle = index * 2.39996323  # golden angle in radians
+    radius = base + step * math.sqrt(index + 1)
+    jitter = (rng.random() - 0.5) * 4.0
+    cx, cy = 50.0, 46.0
+    x = cx + (radius + jitter) * math.cos(angle)
+    y = cy + (radius + jitter) * math.sin(angle) * 0.8  # squash: town is wider than tall
+    return {
+        "x": round(max(2.0, min(98.0, x)), 2),
+        "y": round(max(2.0, min(98.0, y)), 2),
+        "district": _district_for(x, y),
+    }
+
+
+def _category(btype: str) -> str:
+    if btype == "farm":
+        return "farm"
+    if btype == "house":
+        return "house"
+    return "civic"
+
+
+def _district_for(x: float, y: float) -> str:
+    """Name a quarter of town from a coordinate, for flavor."""
+    ns = "North" if y < 46 else "South"
+    ew = "East" if x >= 50 else "West"
+    # The very centre is the Square regardless of quadrant.
+    if 38 <= x <= 62 and 34 <= y <= 58:
+        return "the Market Square"
+    return f"the {ns}{ew.lower()} Quarter"
 
 
 def make_building(
@@ -154,6 +245,7 @@ def make_building(
                 f"{rng.choice(data.BUILDING_NAME_NOUN)} "
                 f"{btype.replace('_', ' ').title()}"
             )
+    place = _place_building(world, rng, btype)
     bid = _new_id(world)
     building = {
         "id": bid,
@@ -164,6 +256,10 @@ def make_building(
         "employs": spec["employs"],
         "workers": [],
         "residents": [],
+        # Stable map placement (schema v2).
+        "x": place["x"],
+        "y": place["y"],
+        "district": place["district"],
     }
     world["buildings"][bid] = building
     return building

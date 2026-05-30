@@ -12,7 +12,7 @@ import os
 from typing import Any
 
 from . import world as worldmod
-from .simulation import living, _age_years
+from .simulation import living, _age_years, full_name
 
 
 def export_web(world: dict[str, Any]) -> str:
@@ -80,9 +80,14 @@ def update_readme(world: dict[str, Any]) -> None:
         f"| Years simulated | {year + 1} |",
     ]
     if oldest:
-        block.append(f"| Eldest resident | {oldest['name']}, age {_age_years(oldest)} |")
+        block.append(f"| Eldest resident | {full_name(oldest)}, age {_age_years(oldest)} |")
     if fam:
         block.append(f"| Largest family | the {fam}s ({fam_n}) |")
+    titled = sorted((c for c in alive if c.get("title")),
+                    key=lambda c: -c.get("reputation", 0))
+    if titled:
+        names = ", ".join(full_name(c) for c in titled[:4])
+        block.append(f"| Citizens of note | {names} |")
     block += [
         "",
         "_Stats and the map under `web/` regenerate every time the town advances._",

@@ -92,5 +92,7 @@ main { max-width: 1000px; margin: 0 auto; padding: 0 1rem 3rem; }
 .tl-item.kind-disaster::before { background: var(--rose); }
 .tl-item.kind-construction::before { background: var(--accent-2); }
 .tl-item.kind-festival::before, .tl-item.kind-wonder::before { background: var(--gold); }
+.tl-item.kind-title::before { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+.tl-item.kind-reconciliation::before { background: var(--accent-2); }
 
 footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 1rem; }

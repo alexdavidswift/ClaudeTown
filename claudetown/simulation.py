@@ -44,6 +44,20 @@ def _trait_score(c: dict[str, Any], pool: set[str]) -> int:
     return sum(1 for t in c["traits"] if t in pool)
 
 
+def full_name(c: dict[str, Any]) -> str:
+    """A citizen's name including any earned title, e.g. 'Ada the Elder'.
+
+    Titles that are honorific prefixes (like 'Master') read better before the
+    given name; epithets ('the Kind') read better after the full name.
+    """
+    title = c.get("title")
+    if not title:
+        return c["name"]
+    if title == data.TITLE_THE_MASTER:
+        return f"{data.TITLE_THE_MASTER} {c['name']}"
+    return f"{c['name']} {title}"
+
+
 # --- Mortality -------------------------------------------------------------
 
 def _monthly_death_chance(c: dict[str, Any]) -> float:
@@ -109,7 +123,10 @@ def advance_month(world: dict[str, Any]) -> dict[str, Any]:
     # 8. Rare town-wide events (festivals, disasters, discoveries).
     _town_events(world, rng, tick, season, chron, record)
 
-    # 9. Record time series.
+    # 9. Reconcile reputations and award newly-earned titles.
+    _award_titles(world, tick, record)
+
+    # 10. Record time series.
     _snapshot(world, chron)
 
     return chron
@@ -204,14 +221,41 @@ def _social_round(world, rng, tick, chron, record):
         roll = rng.random() + social * 0.06 - prickly * 0.05
         if roll > 0.85:
             a["friends"].append(b["id"]); b["friends"].append(a["id"])
+            a["reputation"] += 1; b["reputation"] += 1
             record("friendship",
                    f"{a['name']} and {b['name']} struck up a fast friendship.",
                    [a["id"], b["id"]])
         elif roll < 0.18 and prickly > 0:
             a["rivals"].append(b["id"]); b["rivals"].append(a["id"])
+            a["reputation"] -= 1; b["reputation"] -= 1
             record("rivalry",
                    f"A quarrel soured things between {a['name']} and {b['name']}.",
                    [a["id"], b["id"]])
+
+    # Reconciliation: old rivals can bury the hatchet, the more so if either is
+    # patient or tender-hearted. A healed feud sometimes becomes a friendship.
+    for a in pop:
+        for rid in list(a["rivals"]):
+            b = world["citizens"].get(rid)
+            if not b or not b["alive"] or a["id"] >= b["id"]:
+                continue  # handle each pair once, in id order
+            mend = 0.04 + 0.03 * (_has(a, "patient", "tender-hearted", "humble")
+                                  + _has(b, "patient", "tender-hearted", "humble"))
+            if rng.random() < mend:
+                a["rivals"].remove(rid)
+                if a["id"] in b["rivals"]:
+                    b["rivals"].remove(a["id"])
+                if rng.random() < 0.45 and b["id"] not in a["friends"]:
+                    a["friends"].append(b["id"]); b["friends"].append(a["id"])
+                    a["reputation"] += 1; b["reputation"] += 1
+                    record("reconciliation",
+                           f"{a['name']} and {b['name']} made peace at last, their "
+                           f"old quarrel turning to friendship.",
+                           [a["id"], b["id"]], notable=True)
+                else:
+                    record("reconciliation",
+                           f"{a['name']} and {b['name']} quietly set aside their feud.",
+                           [a["id"], b["id"]])
 
     # Courtship & marriage.
     singles = [c for c in pop
@@ -264,6 +308,7 @@ def _social_round(world, rng, tick, chron, record):
             a["children"].append(child["id"]); b["children"].append(child["id"])
             if home and home in world["buildings"]:
                 world["buildings"][home]["residents"].append(child["id"])
+            a["reputation"] += 1; b["reputation"] += 1
             chron["births"] += 1
             record("birth",
                    f"{child['name']} was born to {a['name']} and {b['name']}.",
@@ -369,9 +414,11 @@ def _run_mortality(world, rng, tick, chron, record):
                     p["milestones"].append({"tick": tick, "text": f"was widowed by {c['name']}"})
             years = _age_years(c)
             founder = any("founder of the town" in m["text"] for m in c["milestones"])
-            notable = years >= 70 or founder or c["job"] in ("mayor", "priest")
+            titled = bool(c.get("title"))
+            notable = years >= 70 or founder or titled or c["job"] in ("mayor", "priest")
+            who = full_name(c)
             record("death",
-                   f"{c['name']} died at {years}, {c['epitaph']}.",
+                   f"{who} died at {years}, {c['epitaph']}.",
                    [c["id"]], notable=notable)
 
 
@@ -427,6 +474,97 @@ def _town_events(world, rng, tick, season, chron, record):
             "An old well, long dry, suddenly ran sweet and cold again.",
         ]
         record("wonder", rng.choice(wonders), notable=True)
+
+
+# --- Reputation & earned titles --------------------------------------------
+
+def _job_tenure_months(c: dict[str, Any], tick: int) -> int:
+    """Months since the citizen last took up their current post."""
+    if not c["job"]:
+        return 0
+    starts = [m["tick"] for m in c["milestones"] if m["text"].startswith("became ")]
+    return tick - max(starts) if starts else 0
+
+
+def _best_title(c: dict[str, Any], tick: int) -> str | None:
+    """Choose the most fitting earned title for a citizen this month.
+
+    Evaluated from most to least prestigious; the first qualifying title wins.
+    A citizen never *loses* a title once earned (see ``_award_titles``), but a
+    grander one can supersede it.
+    """
+    years = _age_years(c)
+    friends, rivals = len(c["friends"]), len(c["rivals"])
+    founder = any("founder of the town" in m["text"] for m in c["milestones"])
+
+    if years >= 80:
+        return data.TITLE_THE_PATRIARCH
+    if years >= 68:
+        return data.TITLE_THE_ELDER
+    if founder and years >= 55:
+        return data.TITLE_THE_FOUNDER
+    if c["job"] in data.SKILLED_JOBS and _job_tenure_months(c, tick) >= 18 * 12:
+        return data.TITLE_THE_MASTER
+    if len(c["children"]) >= 5:
+        return data.TITLE_THE_PROLIFIC
+    if friends >= 5 and rivals == 0 and c["reputation"] >= 6:
+        return data.TITLE_THE_BELOVED
+    if c["job"] in data.SCHOLARLY_JOBS and _job_tenure_months(c, tick) >= 8 * 12:
+        return data.TITLE_THE_LEARNED
+    # Wealth grows slowly and is never spent, so "the Wealthy" must be both a
+    # large fortune and a settled life -- not something a young earner trips.
+    if c["wealth"] >= 500 and years >= 35:
+        return data.TITLE_THE_WEALTHY
+    if _trait_score(c, data.TRAIT_SOCIAL) >= 2 and c["reputation"] >= 8:
+        return data.TITLE_THE_KIND
+    if rivals >= 3 and c["reputation"] <= -4:
+        return data.TITLE_THE_QUARRELSOME
+    return None
+
+
+# Rough prestige ranking so a citizen only ever trades up to a grander title.
+_TITLE_RANK = {
+    data.TITLE_THE_QUARRELSOME: 0,
+    data.TITLE_THE_WEALTHY: 1,
+    data.TITLE_THE_LEARNED: 2,
+    data.TITLE_THE_KIND: 2,
+    data.TITLE_THE_BELOVED: 3,
+    data.TITLE_THE_PROLIFIC: 3,
+    data.TITLE_THE_MASTER: 4,
+    data.TITLE_THE_FOUNDER: 5,
+    data.TITLE_THE_ELDER: 6,
+    data.TITLE_THE_PATRIARCH: 7,
+}
+
+
+def _award_titles(world, tick, record):
+    for c in living(world):
+        # A little reputation reverts toward zero each year so the living must
+        # keep earning it; deeds and ties counter the drift.
+        if tick % 12 == 0 and c["reputation"]:
+            c["reputation"] -= 1 if c["reputation"] > 0 else -1
+
+        candidate = _best_title(c, tick)
+        if not candidate:
+            continue
+        current = c.get("title")
+        if candidate == current:
+            continue
+        # Only adopt a title at least as prestigious as the one already held.
+        if current and _TITLE_RANK.get(candidate, 0) <= _TITLE_RANK.get(current, 0):
+            continue
+        c["title"] = candidate
+        c["milestones"].append({"tick": tick, "text": f"became known as {full_name(c)}"})
+        # The Quarrelsome earns no honor; everything else is a point of pride.
+        if candidate != data.TITLE_THE_QUARRELSOME:
+            record("title",
+                   f"{c['name']} came to be known throughout {world['name']} as "
+                   f"{full_name(c)}.",
+                   [c["id"]], notable=True)
+        else:
+            record("title",
+                   f"{c['name']} earned a sharp reputation as {full_name(c)}.",
+                   [c["id"]])
 
 
 # --- Snapshot --------------------------------------------------------------

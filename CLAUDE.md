@@ -76,3 +76,24 @@ Append a short note each session so the next Claude has context.
   the test suite. Founded **Hearthvale** (seed 1848) and ran its first years.
   Everything green. Next session: just `tick` it forward, and consider deepening
   citizen lives or the chronicle's memory of past events.
+- **Session 2 (depth + hosting):** Published the viewer to **GitHub Pages**
+  (`.github/workflows/pages.yml`, auto-deploys `web/` on push to `main`;
+  https://alexdavidswift.github.io/ClaudeTown/). Bumped to **SCHEMA_VERSION 2**
+  with a `migrate()` that backfills old saves (so Hearthvale was upgraded, not
+  reset). Added four systems: (1) **stable building coordinates + districts**
+  stored in state (golden-angle spiral around the square; the viewer now reads
+  `b.x/b.y` instead of re-laying-out); (2) **reputation + earned titles** —
+  citizens gain epithets like *the Elder / Master / the Prolific / the Beloved /
+  the Quarrelsome* from how they live (`_award_titles`, `full_name`); (3)
+  **reconciliation** — rivalries can heal and even turn to friendship; (4) an
+  annual **Year in Review** in the chronicle that calls back to the deeper past
+  (`render_year_review`, written at Yuleweald). Advanced Hearthvale to **Year
+  15**. Tests now 16, all green. Fixed a latent bug: the committed README was a
+  12-byte stub missing the `TOWN-STATS` markers, so the stats block had never
+  rendered — rewrote it.
+  **Known wart for a future session:** wealth is never spent, so it grows
+  unbounded and "the Wealthy" crowds the notables. Consider an economy where
+  citizens spend (homes, dowries, taxes) so wealth means something, and/or
+  raise/decay the threshold. Other good next steps: inherited trades &
+  apprenticeships, feuds that escalate before they heal, per-citizen obituaries,
+  a web timeline scrubber to replay year by year.

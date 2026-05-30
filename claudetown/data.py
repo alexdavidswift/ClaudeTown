@@ -53,6 +53,33 @@ TRAIT_AMBITIOUS = {"ambitious", "industrious", "inventive", "proud", "restless"}
 TRAIT_SOCIAL = {"kind", "generous", "merry", "witty", "tender-hearted", "gentle"}
 TRAIT_PRICKLY = {"stubborn", "hot-tempered", "scheming", "fickle", "proud", "guarded"}
 
+# --- Earned titles ---------------------------------------------------------
+
+# Epithets a citizen can earn from how they live. Each entry maps a title to a
+# predicate evaluated by the simulation (see ``_award_titles``). Order matters:
+# the first matching title of the highest "weight" wins, so a long, storied
+# life can graduate from "the Steady" to "the Elder".
+#
+# Titles are stored on the citizen as ``title`` and announced in the chronicle
+# the month they are first earned.
+TITLE_THE_ELDER = "the Elder"
+TITLE_THE_PATRIARCH = "the Old"          # very long-lived
+TITLE_THE_KIND = "the Kind"
+TITLE_THE_PROLIFIC = "the Prolific"      # large family
+TITLE_THE_MASTER = "Master"              # long tenure in a skilled trade
+TITLE_THE_BELOVED = "the Beloved"        # many friends, no rivals
+TITLE_THE_QUARRELSOME = "the Quarrelsome"
+TITLE_THE_FOUNDER = "the Founder"
+TITLE_THE_WEALTHY = "the Wealthy"
+TITLE_THE_LEARNED = "the Learned"        # works at library/school/observatory
+
+# Trades considered "skilled" for the Master title.
+SKILLED_JOBS = {
+    "blacksmith", "farrier", "miller", "priest", "astronomer", "cartographer",
+    "librarian", "scribe", "teacher", "tutor", "playwright", "merchant",
+}
+SCHOLARLY_JOBS = {"librarian", "scribe", "teacher", "tutor", "astronomer", "cartographer", "playwright"}
+
 # --- Work & Buildings ------------------------------------------------------
 
 # Each building type: jobs it provides, how many citizens it can employ, and

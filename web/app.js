@@ -77,10 +77,18 @@
 
     const blds = Object.values(W.buildings).sort((a, b) => a.founded_tick - b.founded_tick);
     blds.forEach(b => {
-      const rr = rngFrom((parseInt(b.id, 10) * 2654435761) >>> 0);
       const civic = !["house", "farm"].includes(b.type);
-      const cx = w / 2 + (rr() - 0.5) * (civic ? w * 0.45 : w * 0.85);
-      const cy = h * 0.42 + (rr() - 0.5) * (civic ? h * 0.5 : h * 0.8);
+      // Prefer stable coordinates stored in state (schema v2); fall back to a
+      // deterministic layout for any building that predates them.
+      let cx, cy;
+      if (typeof b.x === "number" && typeof b.y === "number") {
+        cx = (b.x / 100) * w;
+        cy = (b.y / 100) * h;
+      } else {
+        const rr = rngFrom((parseInt(b.id, 10) * 2654435761) >>> 0);
+        cx = w / 2 + (rr() - 0.5) * (civic ? w * 0.45 : w * 0.85);
+        cy = h * 0.42 + (rr() - 0.5) * (civic ? h * 0.5 : h * 0.8);
+      }
       const g = el("g", {});
       const color = ICON[b.type] || "#aaa";
       const size = civic ? 26 : (b.type === "farm" ? 30 : 18);
@@ -90,9 +98,10 @@
       g.appendChild(label);
       const title = el("title", {});
       const staff = (b.workers || []).filter(id => W.citizens[id] && W.citizens[id].alive)
-        .map(id => W.citizens[id].name);
+        .map(id => fullName(W.citizens[id]));
       const homeN = (b.residents || []).filter(id => W.citizens[id] && W.citizens[id].alive).length;
       title.textContent = `${b.name} (${b.type})\nFounded ${dateStr(b.founded_tick)}` +
+        (b.district ? `\nIn ${b.district}` : "") +
         (staff.length ? `\nStaff: ${staff.join(", ")}` : "") +
         (homeN ? `\nHome to ${homeN}` : "");
       g.appendChild(title);
@@ -196,12 +205,17 @@
     if (c.friends && c.friends.length) rel += `${c.friends.length} friend(s). `;
     if (c.rivals && c.rivals.length) rel += `${c.rivals.length} rival(s).`;
     d.innerHTML =
-      `<h3>${c.name}</h3>` +
+      `<h3>${fullName(c)}</h3>` +
       `<div class="meta">${c.alive ? "age " + age : "lived to " + age + " — " + (c.epitaph || "")} · ${job}</div>` +
       `<div class="traits">${(c.traits || []).map(t => `<span>${t}</span>`).join("")}</div>` +
       `<div class="rel">${rel || "&nbsp;"}</div>` +
       (c.alive ? bars(c) : "");
     return d;
+  }
+  // Mirror simulation.full_name: 'Master Ada Quill' vs 'Ada Quill the Elder'.
+  function fullName(c) {
+    if (!c.title) return c.name;
+    return c.title === "Master" ? `Master ${c.name}` : `${c.name} ${c.title}`;
   }
   function bars(c) {
     const row = (label, v, color) =>

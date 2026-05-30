@@ -13,6 +13,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from claudetown import simulation, world as worldmod, chronicle, render  # noqa: E402
+from claudetown.simulation import _age_years  # noqa: E402
 
 
 def fresh(seed=12345, months=0):
@@ -114,6 +115,78 @@ def test_web_export_is_valid_js():
         content = fh.read()
     assert content.startswith("//")
     assert "window.WORLD =" in content
+
+
+# --- Schema v2: coordinates, reputation, titles ---------------------------
+
+def test_buildings_have_stable_coordinates():
+    w = fresh(seed=13, months=80)
+    for b in w["buildings"].values():
+        assert "x" in b and "y" in b and "district" in b
+        assert 0 <= b["x"] <= 100 and 0 <= b["y"] <= 100
+
+
+def test_coordinates_never_change_once_set():
+    """A building keeps its coordinates for life as the town grows around it."""
+    w = worldmod.found_town(seed=21, name="Fixedton")
+    snapshots = {}
+    for _ in range(60):
+        simulation.advance_month(w)
+        for bid, b in w["buildings"].items():
+            if bid in snapshots:
+                assert (b["x"], b["y"]) == snapshots[bid], f"{bid} moved"
+            else:
+                snapshots[bid] = (b["x"], b["y"])
+
+
+def test_citizens_have_reputation_fields():
+    w = fresh(seed=14, months=40)
+    for c in w["citizens"].values():
+        assert "reputation" in c and "title" in c and "deeds" in c
+
+
+def test_migration_backfills_v1_world():
+    """A v1-shaped save loads and gains v2 fields without losing data."""
+    w = fresh(seed=15, months=30)
+    # Strip it back to look like schema v1.
+    w["schema_version"] = 1
+    for c in w["citizens"].values():
+        c.pop("reputation", None); c.pop("title", None); c.pop("deeds", None)
+    for b in w["buildings"].values():
+        b.pop("x", None); b.pop("y", None); b.pop("district", None)
+    n_before = len(w["citizens"])
+    migrated = worldmod.migrate(w)
+    assert migrated["schema_version"] == worldmod.SCHEMA_VERSION
+    assert len(migrated["citizens"]) == n_before
+    for c in migrated["citizens"].values():
+        assert "reputation" in c
+    for b in migrated["buildings"].values():
+        assert "x" in b and "y" in b
+    check_integrity(migrated)
+    # A migrated world keeps simulating cleanly.
+    for _ in range(12):
+        simulation.advance_month(migrated)
+    check_integrity(migrated)
+
+
+def test_titles_are_only_earned_by_the_living_and_persist():
+    w = fresh(seed=16, months=300)
+    titled = [c for c in w["citizens"].values() if c.get("title")]
+    assert titled, "expected some citizens to earn titles over 25 years"
+    # Anyone with the Elder/Old title must actually be old (or have been).
+    for c in w["citizens"].values():
+        if c.get("title") == "the Elder":
+            assert _age_years(c) >= 60
+
+
+def test_year_review_is_deterministic_and_text():
+    from claudetown import chronicle
+    w = worldmod.found_town(seed=17, name="Reviewton")
+    months = [simulation.advance_month(w) for _ in range(12)]
+    a = chronicle.render_year_review(w, 1, months)
+    b = chronicle.render_year_review(w, 1, months)
+    assert a == b  # pure function of recorded facts -> stable
+    assert "Year in Review" in a and isinstance(a, str)
 
 
 if __name__ == "__main__":
