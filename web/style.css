@@ -1,0 +1,96 @@
+:root {
+  --bg: #1a1c2c;
+  --panel: #25283d;
+  --panel-2: #2f3350;
+  --ink: #e8e6df;
+  --muted: #9b9bb3;
+  --accent: #f4a259;
+  --accent-2: #6db4a8;
+  --gold: #f2c94c;
+  --rose: #e08099;
+  --line: #3a3e5e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  background: radial-gradient(1200px 600px at 70% -10%, #2a2e4a, var(--bg));
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+header { padding: 1.6rem 1.4rem 0.8rem; text-align: center; }
+
+h1 {
+  margin: 0;
+  font-size: 2.4rem;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  text-shadow: 0 2px 0 #00000040;
+}
+
+#town-sub { margin: 0.2rem 0 0.9rem; color: var(--muted); font-style: italic; }
+
+.stat-strip { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+.stat-strip .stat {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 0.4rem 0.8rem; font-size: 0.9rem;
+}
+.stat-strip .stat b { color: var(--accent); font-size: 1.1rem; display: block; }
+.stat-strip .stat span { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.tabs { display: flex; gap: 0.3rem; justify-content: center; margin: 1rem auto 0; flex-wrap: wrap; }
+.tabs button {
+  background: var(--panel); color: var(--muted);
+  border: 1px solid var(--line); border-bottom: none;
+  border-radius: 10px 10px 0 0; padding: 0.5rem 1.1rem; font: inherit; cursor: pointer;
+}
+.tabs button.active { background: var(--panel-2); color: var(--gold); }
+
+main { max-width: 1000px; margin: 0 auto; padding: 0 1rem 3rem; }
+.tab-panel {
+  display: none; background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 0 0 14px 14px; padding: 1.2rem; min-height: 60vh;
+}
+.tab-panel.active { display: block; }
+
+.hint { color: var(--muted); font-size: 0.82rem; text-align: center; margin-top: 0.8rem; }
+
+#map-wrap svg { width: 100%; height: auto; display: block; border-radius: 10px; }
+.bld-label { font-size: 9px; fill: var(--muted); font-family: ui-sans-serif, system-ui, sans-serif; }
+
+#charts svg { width: 100%; height: auto; margin-bottom: 1rem; }
+.chart-title { fill: var(--ink); font-size: 13px; font-family: ui-sans-serif, system-ui, sans-serif; }
+.axis { stroke: var(--line); }
+.axis-label { fill: var(--muted); font-size: 9px; font-family: ui-sans-serif, system-ui, sans-serif; }
+
+.people-controls { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+#people-search {
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+  border-radius: 8px; padding: 0.5rem 0.8rem; font: inherit; min-width: 220px;
+}
+.people-controls label { color: var(--muted); font-size: 0.9rem; }
+
+#people-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap: 0.8rem; }
+.person { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem 0.9rem; }
+.person.dead { opacity: 0.55; }
+.person h3 { margin: 0 0 0.2rem; font-size: 1.05rem; }
+.person .meta { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.4rem; }
+.person .traits { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-bottom: 0.4rem; }
+.person .traits span { background: var(--panel-2); border: 1px solid var(--line); border-radius: 20px; padding: 0.05rem 0.5rem; font-size: 0.72rem; color: var(--accent-2); }
+.person .rel { font-size: 0.8rem; color: var(--muted); }
+.person .bars { margin-top: 0.45rem; display: flex; flex-direction: column; gap: 3px; }
+.bar { height: 6px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.bar > i { display: block; height: 100%; }
+
+#timeline { position: relative; }
+.tl-item { border-left: 2px solid var(--line); padding: 0 0 1rem 1rem; margin-left: 0.4rem; position: relative; }
+.tl-item::before { content: ""; position: absolute; left: -6px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.tl-item .date { color: var(--gold); font-size: 0.82rem; }
+.tl-item.kind-disaster::before { background: var(--rose); }
+.tl-item.kind-construction::before { background: var(--accent-2); }
+.tl-item.kind-festival::before, .tl-item.kind-wonder::before { background: var(--gold); }
+
+footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 1rem; }
